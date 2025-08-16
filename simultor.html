@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סימולטור אינטראקטיבי: אופטימיזציה של משנה פאזה</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- KaTeX for math formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous"></script>
+
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f0f4f8;
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+        }
+        .tab-button.active {
+            border-color: #3b82f6;
+            background-color: #3b82f6;
+            color: white;
+        }
+        .info-button {
+            background-color: #93c5fd;
+            color: #1e40af;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .info-button:hover {
+            background-color: #60a5fa;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: auto;
+            padding: 24px;
+            border: 1px solid #888;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            animation: fadeIn 0.3s;
+            position: relative;
+        }
+        @keyframes fadeIn {
+            from {opacity: 0; transform: scale(0.95);}
+            to {opacity: 1; transform: scale(1);}
+        }
+        .step-card {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slideUp 0.5s forwards;
+        }
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* KaTeX styling improvements */
+        .katex {
+            font-size: 1em !important;
+            direction: ltr !important;
+            text-align: center !important;
+        }
+        .katex-display {
+            margin: 0.5em 0 !important;
+            direction: ltr !important;
+            text-align: center !important;
+        }
+        
+        /* Fix math direction in RTL context */
+        .math-container {
+            direction: ltr !important;
+            display: inline-block;
+            text-align: center;
+            unicode-bidi: embed;
+        }
+        
+        /* Ensure proper alignment for inline math */
+        .katex-html {
+            direction: ltr !important;
+            unicode-bidi: embed !important;
+        }
+        
+        /* Force math elements to display left-to-right */
+        .katex, .katex * {
+            direction: ltr !important;
+            unicode-bidi: embed !important;
+        }
+        
+        /* Override any RTL effects on mathematical content */
+        .step-card .math-container {
+            width: 100%;
+            text-align: center;
+        }
+        
+        /* Chart styling for full width */
+        #phaseChart {
+            width: 100% !important;
+            height: 400px !important;
+            max-width: none !important;
+        }
+        
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-5xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <header class="p-6 bg-gray-800 text-white text-center">
+            <h1 class="text-2xl md:text-3xl font-bold">🔬 סימולטור אינטראקטיבי: אופטימיזציה של משנה פאזה</h1>
+            <p class="mt-2 text-gray-300">יישום זה מדגים את תהליך התכנון והאופטימיזציה של רכיב Phase-Shifter, כפי שמוצג במאמר.</p>
+            <button id="refreshMath" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg transition-colors" onclick="renderMathInContainer(document.body)" style="display: none;">
+                🔄 רענן נוסחאות מתמטיות
+            </button>
+        </header>
+
+        <main class="p-6 md:p-8">
+            <!-- Tabs Navigation -->
+            <div class="flex border-b-2 border-gray-200 mb-6 space-x-1 space-x-reverse">
+                <button class="tab-button text-sm md:text-base py-2 px-4 font-semibold border-b-4 border-transparent active" onclick="changeTab(0)">שלב 1: פרמטרי קלט</button>
+                <button class="tab-button text-sm md:text-base py-2 px-4 font-semibold border-b-4 border-transparent" onclick="changeTab(1)" id="tabBtn1" disabled>שלב 2: סימולציה</button>
+                <button class="tab-button text-sm md:text-base py-2 px-4 font-semibold border-b-4 border-transparent" onclick="changeTab(2)" id="tabBtn2" disabled>שלב 3: חילוץ תוצאות</button>
+                <button class="tab-button text-sm md:text-base py-2 px-4 font-semibold border-b-4 border-transparent" onclick="changeTab(3)" id="tabBtn3" disabled>שלב 4: תוצאה סופית</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div id="tab-content">
+                <!-- Step 1: Input Parameters -->
+                <div class="tab-pane active">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">שלב 1: הגדרת פרמטרי קלט</h2>
+                    <p class="mb-6 text-gray-600">התחל בבחירת הפרמטרים הגיאומטריים ופרמטרי החומר של הרכיב. כל פרמטר משפיע על הפשרה (trade-off) בין יעילות חשמלית, הפסדים אופטיים וגודל פיזי. לחץ על כפתור ה- <span class="info-button text-sm">?</span> לקבלת הסבר מפורט.</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Parameter Sliders -->
+                        <div class="space-y-6">
+                            <!-- Rib Width -->
+                            <div>
+                                <label for="ribWidth" class="flex items-center font-semibold text-gray-700">רוחב ליבת מוליך הגלים (W<sub>r</sub>) <span class="info-button mr-2" onclick="showInfo('ribWidth')">?</span></label>
+                                <div class="flex items-center space-x-4 space-x-reverse">
+                                    <input type="range" id="ribWidth" min="0.4" max="0.5" step="0.01" value="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="ribWidthValue" class="font-mono text-blue-600 w-20 text-center">0.50 µm</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">טווח: 0.4 - 0.5 מיקרון</div>
+                            </div>
+                            <!-- Etching Depth -->
+                            <div>
+                                <label for="etchingDepth" class="flex items-center font-semibold text-gray-700">עומק איכול (h<sub>r</sub>) <span class="info-button mr-2" onclick="showInfo('etchingDepth')">?</span></label>
+                                <div class="flex items-center space-x-4 space-x-reverse">
+                                    <input type="range" id="etchingDepth" min="90" max="130" value="110" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="etchingDepthValue" class="font-mono text-blue-600 w-20 text-center">110 nm</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">עובי ה-slab (h<sub>si</sub>): <span id="slabThicknessValue" class="font-mono">110 nm</span> | טווח: 90-130 nm</div>
+                            </div>
+                            <!-- Doping Distance -->
+                            <div>
+                                <label for="dopingDistance" class="flex items-center font-semibold text-gray-700">מרחק לאזורי האילוח (S) <span class="info-button mr-2" onclick="showInfo('dopingDistance')">?</span></label>
+                                <div class="flex items-center space-x-4 space-x-reverse">
+                                    <input type="range" id="dopingDistance" min="0.5" max="2" step="0.1" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="dopingDistanceValue" class="font-mono text-blue-600 w-20 text-center">2.0 µm</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">טווח: 0.5 - 2.0 מיקרון</div>
+                            </div>
+                            <!-- Doping Concentration -->
+                            <div>
+                                <label for="dopingConc" class="flex items-center font-semibold text-gray-700">ריכוז אילוח (p ו-n) <span class="info-button mr-2" onclick="showInfo('dopingConc')">?</span></label>
+                                <div class="flex items-center space-x-4 space-x-reverse">
+                                    <input type="range" id="dopingConc" min="17" max="19" step="0.1" value="17" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="dopingConcValue" class="font-mono text-blue-600 w-28 text-center">1.0e+17 cm<sup>-3</sup></span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">טווח: 10<sup>17</sup> - 10<sup>19</sup> cm<sup>-3</sup></div>
+                            </div>
+                            <!-- Device Length -->
+                            <div>
+                                <label for="deviceLength" class="flex items-center font-semibold text-gray-700">אורך הרכיב (L) <span class="info-button mr-2" onclick="showInfo('deviceLength')">?</span></label>
+                                <div class="flex items-center space-x-4 space-x-reverse">
+                                    <input type="range" id="deviceLength" min="0.3" max="0.5" step="0.01" value="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span id="deviceLengthValue" class="font-mono text-blue-600 w-20 text-center">0.50 mm</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">טווח: 0.3 - 0.5 מ"מ</div>
+                            </div>
+                            <!-- Wavelength (Fixed) -->
+                            <div>
+                                <label class="flex items-center font-semibold text-gray-700">אורך גל הפעולה (λ)</label>
+                                <div class="flex items-center space-x-4 space-x-reverse">
+                                    <div class="w-full h-2 bg-gray-100 rounded-lg flex items-center justify-center">
+                                        <span class="text-xs text-gray-600">קבוע</span>
+                                    </div>
+                                    <span class="font-mono text-blue-600 w-20 text-center">1550 nm</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">קבוע - תקן בתקשורת אופטית</div>
+                            </div>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                            <h3 class="font-bold text-blue-800 mb-2">💡 התכנון האופטימלי מהמאמר</h3>
+                            <p class="text-sm text-blue-700">הערכים ההתחלתיים של הסליידרים מייצגים את התכנון האופטימלי שהושג במאמר.</p>
+                            <ul class="list-disc list-inside mt-3 text-sm text-blue-700 space-y-1">
+                                <li><strong>פרמטרים גיאומטריים 📐</strong></li>
+                                <li>W<sub>r</sub> = 0.5 µm (טווח: 0.4-0.5)</li>
+                                <li>h<sub>r</sub> = 110 nm (טווח: 90-130)</li>
+                                <li>S = 2.0 µm (טווח: 0.5-2.0)</li>
+                                <li><strong>פרמטרים חשמליים ⚡</strong></li>
+                                <li>ריכוז אילוח = 1.0e+17 cm<sup>-3</sup> (10<sup>17</sup>-10<sup>19</sup>)</li>
+                                <li><strong>פרמטרים מערכתיים ⚙️</strong></li>
+                                <li>L = 0.5 mm (טווח: 0.3-0.5)</li>
+                                <li>λ = 1550 nm (קבוע)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105" onclick="changeTab(1)">המשך לשלב הסימולציה &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Simulation Loop -->
+                <div class="tab-pane hidden">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">שלב 2: לולאת הסימולציה ⚙️</h2>
+                    <p class="mb-6 text-gray-600">זהו הלב החישובי של התהליך. אנו מדמים הפעלת מתח משתנה ($V_F$) על הרכיב ומחשבים את השפעתו. הזז את הסליידר כדי לראות כיצד כל שלב בתהליך מגיב למתח.</p>
+                    
+                    <div class="mb-6">
+                        <label for="vfSlider" class="font-semibold text-gray-700">רמת מתח הדרייבר ($V_F$)</label>
+                        <div class="flex items-center space-x-4 space-x-reverse">
+                            <input type="range" id="vfSlider" min="0" max="2" step="0.01" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            <span id="vfSliderValue" class="font-mono text-red-600 w-20 text-center">0.00 V</span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">טווח: 0 - 2 וולט (כפי שנסרק במאמר)</div>
+                    </div>
+
+                    <div id="simulation-steps" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Simulation Step Cards will be injected here by JS -->
+                    </div>
+                    <div class="mt-8 text-center">
+                        <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105" onclick="changeTab(2)">המשך לחילוץ תוצאות &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Result Extraction -->
+                <div class="tab-pane hidden">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">שלב 3: חילוץ תוצאות ומציאת <span class="math-container" dir="ltr">$V_{\pi}$</span></h2>
+                    <p class="mb-6 text-gray-600">לאחר הרצת הסימולציות, אנו מנתחים את הקשר בין המתח (<span class="math-container" dir="ltr">$V_F$</span>) לשינוי הפאזה (<span class="math-container" dir="ltr">$\Delta\Phi$</span>). המטרה היא למצוא את המתח המדויק הגורם לשינוי פאזה של <span class="math-container" dir="ltr">$\pi$</span> רדיאנים.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="md:col-span-2 bg-gray-50 p-4 rounded-lg">
+                            <canvas id="phaseChart" style="width: 100% !important; height: 400px !important;"></canvas>
+                        </div>
+                        <div class="flex flex-col justify-center items-center bg-green-50 p-6 rounded-lg border-l-4 border-green-500">
+                            <h3 class="font-bold text-green-800 text-lg">מתח פאי (<span class="math-container" dir="ltr">$V_{\pi}$</span>)</h3>
+                            <p class="text-sm text-green-700 text-center my-2">המתח שבו שינוי הפאזה מגיע ל-<span class="math-container" dir="ltr">$\pi$</span> (3.14 rad).</p>
+                            <div id="vpiResult" class="text-4xl font-bold font-mono text-green-600 my-4">
+                                --- V
+                            </div>
+                            <p class="text-xs text-gray-500 text-center">ערך זה מייצג את היעילות האנרגטית של הרכיב. ערך נמוך יותר הוא טוב יותר.</p>
+                        </div>
+                    </div>
+                    <div class="mt-8 text-center">
+                        <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105" onclick="changeTab(3)">המשך לתוצאה הסופית &rarr;</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Final Result -->
+                <div class="tab-pane hidden">
+                     <h2 class="text-xl font-bold text-gray-700 mb-4">שלב 4: תוצאה סופית - יעילות האפנון (<span class="math-container" dir="ltr">$V_{\pi}L$</span>) 🏆</h2>
+                    <p class="mb-6 text-gray-600">זהו מדד הביצועים (Figure of Merit) הסופי, המשלב את היעילות האנרגטית (<span class="math-container" dir="ltr">$V_{\pi}$</span>) עם הגודל הפיזי (L) של הרכיב. ערך נמוך יותר מעיד על תכנון עדיף.</p>
+                    <div class="flex flex-col items-center justify-center bg-indigo-50 p-8 rounded-2xl shadow-inner">
+                        <h3 class="text-2xl font-bold text-indigo-800">יעילות האפנון</h3>
+                        <div class="text-6xl font-bold font-mono text-indigo-600 my-6" id="vpiLResult">
+                            ---
+                        </div>
+                        <div class="text-lg text-indigo-700 math-container mx-auto" id="vpiLFormula" dir="ltr">
+                            $V_{\pi}L = V_{\pi} \times L$
+                        </div>
+                        <div class="mt-6 p-4 bg-white rounded-lg shadow-md text-center">
+                            <p class="font-semibold">השוואה לתכנון האופטימלי מהמאמר:</p>
+                            <p class="font-mono text-lg"><span id="comparisonResult"></span> (היעד: 0.815 V·mm)</p>
+                        </div>
+                    </div>
+                    <div class="mt-8 flex justify-center flex-wrap gap-4">
+                        <button class="bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105" onclick="resetApp()">התחל מחדש</button>
+                        <button class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 flex items-center" onclick="getOptimizationSuggestion()">
+                            <span class="ml-2">✨</span> קבל הצעות לשיפור
+                        </button>
+                        <button class="bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 flex items-center" onclick="getDesignSummary()">
+                            <span class="ml-2">✨</span> סכם את התכנון
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Info and Gemini -->
+    <div id="infoModal" class="modal" onclick="closeModal()">
+        <div class="modal-content" onclick="event.stopPropagation();">
+            <div id="modal-loader" class="hidden absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center rounded-lg">
+                <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-blue-500"></div>
+            </div>
+            <h3 id="modalTitle" class="text-xl font-bold mb-4"></h3>
+            <div id="modalText" class="text-gray-700 whitespace-pre-wrap"></div>
+            <div class="mt-6 text-right">
+                <button class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg" onclick="closeModal()">סגור</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- State Management ---
+        let currentTab = 0;
+        const tabs = document.querySelectorAll('.tab-pane');
+        const tabButtons = document.querySelectorAll('.tab-button');
+        let chartInstance = null;
+        
+        const infoContent = {
+            ribWidth: {
+                title: 'רוחב מוליך הגל (w<sub>r</sub>)',
+                text: 'פרמטר זה קובע את רוחב "הצלע" של מוליך הגל. רוחב גדול יותר משפר את כליאת האור ומפחית הפסדים, אך עלול לתמוך במצבי התפשטות (מודים) לא רצויים. האופטימיזציה מחפשת את האיזון האידיאלי.'
+            },
+            etchingDepth: {
+                title: 'עומק הצרבה (h<sub>r</sub>) ועובי הלוח (h<sub>si</sub>)',
+                text: 'פרמטרים אלו מגדירים את חתך הגובה של מוליך הגל. סכומם קבוע (220 ננומטר). עומק הצרבה סימטרי (110 ננומטר) נמצא כאופטימלי במאמר, מכיוון שהוא מספק כליאת אור טובה תוך שמירה על יעילות חשמלית. שינוי ביחס ביניהם משפיע על הפשרה בין הפסדים ליעילות.'
+            },
+            dopingDistance: {
+                title: 'מרחק לאזורי הסימום (S)',
+                text: 'זהו המרחק בין ליבת מוליך הגל, שבה עובר האור, לבין האזורים המאולחים (p/n). מרחק קטן משפר את היעילות החשמלית (דורש פחות מתח), אך מגדיל את ההפסדים האופטיים כי האור "זולג" לאזורים הבולעים. מרחק גדול מפחית הפסדים אך דורש מתח גבוה יותר.'
+            },
+            dopingConc: {
+                title: 'ריכוז סימום (n, p)',
+                text: 'ריכוז האטומים הזרים היוצרים את דיודת ה-PIN. ריכוז גבוה יותר מספק יותר נושאי מטען, מה שמשפר את יעילות שינוי הפאזה. עם זאת, ריכוז גבוה מדי מגדיל באופן דרמטי את הבליעה האופטית (הפסדים).'
+            },
+            deviceLength: {
+                title: 'אורך הרכיב (L)',
+                text: 'האורך הפיזי של האזור הפעיל. רכיב ארוך יותר דורש מתח נמוך יותר ($V_{\\pi}$) כדי להשיג את אותו שינוי פאזה, אך הוא תופס יותר שטח על השבב וסובל מהפסד אופטי כולל גבוה יותר. המדד $V_{\\pi}L$ מנרמל את ההשפעה הזו.'
+            }
+        };
+
+        // --- UI Functions ---
+        function changeTab(tabIndex) {
+            if (tabIndex > currentTab + 1 && !document.getElementById(`tabBtn${tabIndex-1}`).disabled) return;
+            
+            if (tabIndex > currentTab) {
+                const nextBtn = document.getElementById(`tabBtn${tabIndex}`);
+                if (nextBtn) nextBtn.disabled = false;
+            }
+
+            tabs.forEach((tab, index) => {
+                tab.classList.toggle('hidden', index !== tabIndex);
+                tab.classList.toggle('active', index === tabIndex);
+            });
+            tabButtons.forEach((button, index) => {
+                button.classList.toggle('active', index === tabIndex);
+            });
+            currentTab = tabIndex;
+
+            if (tabIndex === 1) {
+                updateSimulationStep(parseFloat(document.getElementById('vfSlider').value));
+            } else if (tabIndex === 2) {
+                renderChart();
+            } else if (tabIndex === 3) {
+                calculateFinalResult();
+            }
+            
+            // Re-render math after tab change
+            setTimeout(() => {
+                renderMathInContainer(document.querySelector('.tab-pane.active') || document.body);
+            }, 100);
+        }
+
+        function showInfo(param) {
+            document.getElementById('modalTitle').innerHTML = infoContent[param].title;
+            document.getElementById('modalText').innerText = infoContent[param].text;
+            document.getElementById('infoModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('infoModal').style.display = 'none';
+        }
+
+        function resetApp() {
+            document.getElementById('ribWidth').value = 0.5;  // Changed to µm
+            document.getElementById('etchingDepth').value = 110;
+            document.getElementById('dopingDistance').value = 2;
+            document.getElementById('dopingConc').value = 17;
+            document.getElementById('deviceLength').value = 0.5;
+            updateSliderValues();
+
+            for (let i = 1; i <= 3; i++) {
+                document.getElementById(`tabBtn${i}`).disabled = true;
+            }
+            changeTab(0);
+        }
+
+        // --- Simulation & Calculation Logic ---
+        function getSimulationParameters() {
+            const wr = parseFloat(document.getElementById('ribWidth').value);
+            const hr = parseFloat(document.getElementById('etchingDepth').value);
+            const hsi = 220 - hr;
+            const s = parseFloat(document.getElementById('dopingDistance').value);
+            const log_doping = parseFloat(document.getElementById('dopingConc').value);
+            const l = parseFloat(document.getElementById('deviceLength').value);
+            
+            const baseVpi = 1.629;
+            // Convert wr from µm to nm for calculation
+            const wr_nm = wr * 1000;
+            const wr_factor = 1 - ((wr_nm - 400) / 100) * 0.02;
+            const s_factor = 1 + ((s - 0.5) / 1.5) * 0.12;
+            const doping_factor = 1 - ((log_doping - 17) / 2) * 0.5;
+            // Model non-linear effect of etching depth, optimal at 110nm
+            const hr_factor = 1 + Math.pow((hr - 110) / 20, 2) * 0.1; // ~10% penalty at extremes
+
+            const v_pi = baseVpi * wr_factor * s_factor * doping_factor * hr_factor;
+            const v_pi_l = v_pi * l;
+            
+            return { wr, hr, hsi, s, log_doping, l, v_pi, v_pi_l };
+        }
+
+        function updateSimulationStep(vf) {
+            const params = getSimulationParameters();
+            const phase = (vf >= 0.7) ? (Math.PI * Math.pow((vf - 0.7) / (params.v_pi - 0.7), 2)) : 0;
+            
+            const steps = [
+                { title: 'סימולציה חשמלית', icon: '⚡️', formula: '$V_F \\to \\Delta N_e, \\Delta N_h$', value: `${(phase * 2e17).toExponential(2)} cm<sup>-3</sup>`, explanation: 'המתח גורם להזרקת נושאי מטען (אלקטרונים וחורים) לליבת מוליך הגל.' },
+                { title: 'Soref & Bennett', icon: '🔬', formula: '$\\Delta N \\to \\Delta n$', value: `${(-0.0025 * phase / Math.PI).toFixed(5)}`, explanation: 'ריכוז המטענים משנה את מקדם השבירה של הסיליקון.' },
+                { title: 'סימולציה אופטית', icon: '💡', formula: '$\\Delta n \\to \\Delta n_{eff}$', value: `${(-0.0018 * phase / Math.PI).toFixed(5)}`, explanation: 'הסימולטור מחשב את השינוי האפקטיבי שהאור "מרגיש" בפועל.' },
+                { title: 'שינוי פאזה', icon: '🌊', formula: '$\\Delta\\Phi = \\dfrac{2\\pi \\Delta n_{eff} L}{\\lambda}$', value: `${phase.toFixed(3)} rad`, explanation: 'התוצאה הסופית: שינוי הפאזה המצטבר לאורך הרכיב.' }
+            ];
+
+            const container = document.getElementById('simulation-steps');
+            container.innerHTML = '';
+            steps.forEach((step, index) => {
+                const card = document.createElement('div');
+                card.className = 'step-card bg-gray-50 p-4 rounded-lg border text-center shadow-sm';
+                card.style.animationDelay = `${index * 100}ms`;
+                card.innerHTML = `
+                    <div class="text-3xl mb-2">${step.icon}</div>
+                    <h3 class="font-bold text-gray-800">${step.title}</h3>
+                    <div class="my-3 text-sm text-gray-500 h-12 flex items-center justify-center">
+                        <div class="math-container" dir="ltr">${step.formula}</div>
+                    </div>
+                    <div class="font-mono text-lg text-blue-600 bg-white p-2 rounded">${step.value}</div>
+                    <p class="text-xs text-gray-500 mt-3">${step.explanation}</p>
+                `;
+                container.appendChild(card);
+            });
+            renderMathInContainer(container);
+        }
+
+        function renderChart() {
+            const params = getSimulationParameters();
+            const ctx = document.getElementById('phaseChart').getContext('2d');
+            
+            const labels = [];
+            const data = [];
+            for (let vf = 0; vf <= 2; vf += 0.05) {
+                labels.push(vf.toFixed(2));
+                const phase = (vf >= 0.7) ? (Math.PI * Math.pow((vf - 0.7) / (params.v_pi - 0.7), 2)) : 0;
+                data.push(phase);
+            }
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'שינוי פאזה (ΔΦ)',
+                        data: data,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        borderWidth: 3,
+                        pointRadius: 2
+                    }, {
+                        label: 'יעד פאי (π)',
+                        data: Array(labels.length).fill(Math.PI),
+                        borderColor: '#10b981',
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false,
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            title: { 
+                                display: true, 
+                                text: 'מתח הפעלה (V_F) [V]',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        y: { 
+                            title: { 
+                                display: true, 
+                                text: 'שינוי פאזה (ΔΦ) [rad]',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            grid: {
+                                display: true,
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+            document.getElementById('vpiResult').innerText = `${params.v_pi.toFixed(3)} V`;
+        }
+        
+        function calculateFinalResult() {
+            const params = getSimulationParameters();
+            document.getElementById('vpiLResult').innerText = `${params.v_pi_l.toFixed(3)} V·mm`;
+            const formulaDiv = document.getElementById('vpiLFormula');
+            formulaDiv.innerHTML = `$V_{\\pi}L = ${params.v_pi.toFixed(3)} V \\times ${params.l.toFixed(2)} mm$`;
+            renderMathInContainer(formulaDiv);
+
+            const comparisonSpan = document.getElementById('comparisonResult');
+            const diff = ((params.v_pi_l - 0.815) / 0.815) * 100;
+            if (Math.abs(diff) < 1) {
+                comparisonSpan.innerText = 'תוצאה אופטימלית! 🌟';
+                comparisonSpan.className = 'text-green-600 font-bold';
+            } else if (diff > 0) {
+                comparisonSpan.innerText = `גבוה ב-${diff.toFixed(1)}%`;
+                comparisonSpan.className = 'text-red-600 font-bold';
+            } else {
+                comparisonSpan.innerText = `נמוך ב-${Math.abs(diff).toFixed(1)}% (שיפור!)`;
+                comparisonSpan.className = 'text-green-600 font-bold';
+            }
+        }
+
+        // --- Gemini API Integration ---
+        function showModalWithLoader(title) {
+            document.getElementById('modalTitle').innerHTML = title;
+            document.getElementById('modalText').innerHTML = '';
+            const modal = document.getElementById('infoModal');
+            modal.style.display = 'flex';
+            document.getElementById('modal-loader').classList.remove('hidden');
+        }
+
+        function updateModalContent(content) {
+            document.getElementById('modal-loader').classList.add('hidden');
+            document.getElementById('modalText').innerText = content;
+        }
+
+        async function fetchWithBackoff(apiUrl, payload, retries = 5, delay = 1000) {
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) return await response.json();
+                    
+                    const errorResult = await response.json();
+                    console.error("API Error:", errorResult);
+                    if (response.status === 429 || response.status >= 500) {
+                         await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+                    } else {
+                        return { error: `שגיאת API: ${errorResult.error?.message || response.statusText}` };
+                    }
+                } catch (error) {
+                    console.error("Fetch Error:", error);
+                    if (i === retries - 1) return { error: "שגיאת רשת לאחר מספר ניסיונות." };
+                    await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+                }
+            }
+            return { error: "הקריאה ל-API נכשלה לאחר מספר ניסיונות." };
+        }
+
+        async function callGemini(prompt) {
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+            const result = await fetchWithBackoff(apiUrl, payload);
+
+            if (result.error) return `שגיאה: ${result.error}`;
+            
+            if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                return result.candidates[0].content.parts[0].text;
+            } else {
+                console.error("Unexpected API response structure:", result);
+                return "התקבלה תגובה לא צפויה מה-API. אנא נסה שוב.";
+            }
+        }
+
+        async function getOptimizationSuggestion() {
+            const params = getSimulationParameters();
+            showModalWithLoader("✨ הצעות לשיפור מה-AI");
+
+            const prompt = `You are a photonics expert analyzing a silicon phase-shifter design. The current parameters are:
+- Rib Width (wr): ${params.wr} nm
+- Etching Depth (hr): ${params.hr} nm (resulting in a slab thickness hsi of ${params.hsi} nm)
+- Doping Distance (S): ${params.s} µm
+- Doping Concentration: 1e${params.log_doping} cm^-3
+- Device Length (L): ${params.l} mm
+The resulting modulation efficiency is VπL = ${params.v_pi_l.toFixed(3)} V·mm. The goal is to minimize VπL.
+
+Based on the physics described in the paper 'Optimizations of Si PIN diode phase-shifter...' by Moshaev et al., suggest ONE specific parameter to change to improve the result. Explain the physical trade-off involved in your suggestion. Be concise (2-3 sentences) and practical. Respond in Hebrew.`;
+
+            const suggestion = await callGemini(prompt);
+            updateModalContent(suggestion);
+        }
+
+        async function getDesignSummary() {
+            const params = getSimulationParameters();
+            showModalWithLoader("✨ סיכום תכנון מה-AI");
+
+            const prompt = `You are an engineering assistant writing a summary for a lab report. Generate a professional, 2-3 sentence summary in Hebrew for a silicon phase-shifter design with the following final parameters and results:
+- Rib Width (wr): ${params.wr} nm
+- Etching Depth (hr): ${params.hr} nm
+- Slab Thickness (hsi): ${params.hsi} nm
+- Doping Distance (S): ${params.s} µm
+- Doping Concentration: 1e${params.log_doping} cm^-3
+- Device Length (L): ${params.l} mm
+- Achieved Vπ: ${params.v_pi.toFixed(3)} V
+- Final Modulation Efficiency (VπL): ${params.v_pi_l.toFixed(3)} V·mm
+
+Highlight the key performance metric (VπL) and briefly characterize the design's efficiency based on this result (e.g., mention if it's efficient, requires improvement, etc., comparing implicitly to the paper's optimal value of 0.815 V·mm).`;
+
+            const summary = await callGemini(prompt);
+            updateModalContent(summary);
+        }
+
+        // --- Event Listeners ---
+        function updateSliderValues() {
+            // Rib Width (now in µm)
+            const ribWidth = parseFloat(document.getElementById('ribWidth').value).toFixed(2);
+            document.getElementById('ribWidthValue').innerText = `${ribWidth} µm`;
+            // Etching Depth
+            const etchingDepth = document.getElementById('etchingDepth').value;
+            document.getElementById('etchingDepthValue').innerText = `${etchingDepth} nm`;
+            document.getElementById('slabThicknessValue').innerText = `${220 - etchingDepth} nm`;
+            // Doping Distance
+            const dopingDistance = parseFloat(document.getElementById('dopingDistance').value).toFixed(1);
+            document.getElementById('dopingDistanceValue').innerText = `${dopingDistance} µm`;
+            // Doping Conc
+            const dopingConc = parseFloat(document.getElementById('dopingConc').value);
+            document.getElementById('dopingConcValue').innerHTML = `${(Math.pow(10, dopingConc) / 1e17).toFixed(1)}e+${Math.floor(dopingConc)} cm<sup>-3</sup>`;
+            // Device Length
+            const deviceLength = parseFloat(document.getElementById('deviceLength').value).toFixed(2);
+            document.getElementById('deviceLengthValue').innerText = `${deviceLength} mm`;
+        }
+
+        document.querySelectorAll('input[type="range"]').forEach(slider => {
+            slider.addEventListener('input', updateSliderValues);
+        });
+        
+        document.getElementById('vfSlider').addEventListener('input', (e) => {
+            const vf = parseFloat(e.target.value);
+            document.getElementById('vfSliderValue').innerText = `${vf.toFixed(2)} V`;
+            updateSimulationStep(vf);
+        });
+
+        // --- Math Rendering Helper ---
+        function renderMathInContainer(container) {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(container, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    throwOnError: false,
+                    errorColor: '#cc0000'
+                });
+            }
+        }
+
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSliderValues();
+            changeTab(0);
+            
+            // Wait for KaTeX to load, then render math with retries
+            let retryCount = 0;
+            const maxRetries = 5;
+            
+            function tryRenderMath() {
+                if (typeof renderMathInElement !== 'undefined') {
+                    renderMathInContainer(document.body);
+                    console.log('✅ Math rendering completed successfully');
+                } else if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`⏳ Waiting for KaTeX to load... (attempt ${retryCount}/${maxRetries})`);
+                    setTimeout(tryRenderMath, 1000);
+                } else {
+                    console.error('❌ KaTeX failed to load after multiple attempts');
+                    // Show the refresh button if KaTeX fails to load
+                    document.getElementById('refreshMath').style.display = 'inline-block';
+                }
+            }
+            
+            setTimeout(tryRenderMath, 500);
+        });
+
+    </script>
+</body>
+</html>
